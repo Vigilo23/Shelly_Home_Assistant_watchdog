@@ -1,1 +1,81 @@
-#
+// ====== CONFIG ======
+let HA_URL = "http://192.168.178.xxx:8123/manifest.json"; // <-- Home_Assistant-IP anpassen
+let CHECK_INTERVAL = 420 * 1000;   // Sekunden bis zum nächsten Check (hier: 7 Minuten)
+let FAIL_THRESHOLD = 10;            // wie viele Fehler bis Reboot
+let POWER_OFF_TIME = 15 * 1000;    // 15 Sekunden AUS
+let REBOOT_COOLDOWN = 60 * 60 * 1000; // 30 Minuten Schutzzeit
+// ====================
+
+let failCount = 0;
+let lastReboot = 0;
+
+function checkHA() {
+  Shelly.call(
+    "HTTP.GET",
+    { url: HA_URL, timeout: 5 },
+    function (res, err) {
+      if (err || res.code !== 200) {
+        failCount++;
+        print("HA check FAILED (" + failCount + "/" + FAIL_THRESHOLD + ")");
+        sendTelegramMessage("HA check FAILED (" + failCount + "/" + FAIL_THRESHOLD + ")");
+      } else {
+        failCount = 0;
+        print("HA OK");
+      }
+
+      if (failCount >= FAIL_THRESHOLD) {
+        tryReboot();
+      }
+    }
+  );
+}
+
+function tryReboot() {
+  let now = Date.now();
+
+  if (now - lastReboot < REBOOT_COOLDOWN) {
+    print("Reboot blocked (cooldown active)");
+    sendTelegramMessage("Reboot blocked (cooldown active)");
+    return;
+  }
+
+  print("!!! HA unresponsive → Power cycle !!!");
+  sendTelegramMessage("!!! HA unresponsive → Power cycle !!!");
+  lastReboot = now;
+  failCount = 0;
+
+  Shelly.call("Switch.Set", { id: 0, on: false });
+
+  Timer.set(POWER_OFF_TIME, false, function () {
+    Shelly.call("Switch.Set", { id: 0, on: true });
+    print("Power restored");
+    sendTelegramMessage("Power restored");
+  });
+}
+
+function sendTelegramMessage(message) {
+  let token = "hiertokeneintragen"; // <-- Telegram-Bot-Token anpassen
+  let chat_id = "ID"; // <-- Chat-ID anpassen (z.B. eigene Telegram-ID oder Gruppen-ID)
+  let url = "https://api.telegram.org/bot" + token + "/sendMessage";
+
+  Shelly.call(
+    "HTTP.POST",
+    {
+      url: url,
+      body: JSON.stringify({
+        chat_id: chat_id,
+        text: message
+      }),
+      headers: { "Content-Type": "application/json" }
+    },
+    function (res, err) {
+      if (err) print("Telegram Error:", err);
+      else print("Telegram sent:", res.code);
+    }
+  );
+}
+
+// Start watchdog
+Timer.set(CHECK_INTERVAL, true, checkHA);
+print("HA watchdog started");
+sendTelegramMessage("HA watchdog started");
