@@ -1,5 +1,5 @@
 // ====== CONFIG ======
-let HA_URL = "http://192.168.178.xxx:8123/manifest.json"; // <-- Home_Assistant-IP anpassen
+let HA_URL = "http://192.168.178.xxx:80/manifest.json"; // <-- Home_Assistant-IP anpassen
 let CHECK_INTERVAL = 420 * 1000;   // Sekunden bis zum nächsten Check (hier: 7 Minuten)
 let FAIL_THRESHOLD = 10;            // wie viele Fehler bis Reboot
 let POWER_OFF_TIME = 15 * 1000;    // 15 Sekunden AUS
